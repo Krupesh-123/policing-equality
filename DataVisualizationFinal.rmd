@@ -1,0 +1,416 @@
+---
+title: "Data Visualization"
+author: "Rupesh Kairamkonda (2200964)"
+
+date: "2023-04-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#install.packages(c("ggmap","shiny","leaflet","RColorBrewer","tidyverse","dplyr","leaflet.extras",                   "#lubridate","gridExtra","tidyr","ggplot2","ggridges","viridis"))
+library(ggmap)
+library(leaflet)
+library(dplyr)
+library(RColorBrewer)
+library(leaflet.extras)
+library(lubridate)
+library(tidyverse)
+library(gridExtra)
+library(ggplot2)
+library(viridis)
+library(tidyr)
+library(corrplot)
+library(shiny)
+library(htmlwidgets)
+library(ggridges)
+library(leaflet)
+
+dvDataFrame <- read.csv("C:/Users/Rupesh/OneDrive - University of Essex/Desktop/Data Visualization/37-00049_UOF-P_2016_prepped.csv",na.strings = c(""))
+dvDataFrame = dvDataFrame[-1,]
+head(dvDataFrame)
+dim(dvDataFrame)
+
+#Adds 20 to the year value if whole year is not mentioned
+dvDataFrame$INCIDENT_DATE <- as.Date(dvDataFrame$INCIDENT_DATE, format = "%m/%d/%Y")
+dvDataFrame$INCIDENT_DATE <- gsub("00","20",dvDataFrame$INCIDENT_DATE)
+dvDataFrame$INCIDENT_DATE
+#convert  incident_date column type from string to Date type
+dvDataFrame$INCIDENT_DATE <- as.Date(dvDataFrame$INCIDENT_DATE, format = "%Y-%m-%d")
+dvDataFrame$INCIDENT_DATE
+#Convert time from 12 hour format to 24 hour format
+dvDataFrame$INCIDENT_TIME <- format(strptime(dvDataFrame$INCIDENT_TIME, "%I:%M:%S %p"), "%H:%M:%S")
+dvDataFrame$INCIDENT_TIME
+#adds new column to the data frame, which has values of months IN CHARACTERS from incident_date column, you can name this column anyway
+dvDataFrame$INCIDENT_MONTH <- months(as.Date(dvDataFrame$INCIDENT_DATE))
+dvDataFrame$INCIDENT_MONTH
+
+
+# the table says what race officer is involved with what race subject
+OfSubRaceTab<-table(dvDataFrame$OFFICER_RACE,dvDataFrame$SUBJECT_RACE)
+OfSubRaceTab
+OfSubRaceTabPerc<-round( 100*prop.table(OfSubRaceTab))
+#PERCENTAGES WITH EACH ROW
+OfSubRaceTabPercPerRow<-round( 100*prop.table(OfSubRaceTab,margin=1),2)
+OfSubRaceTabPerc
+OfSubRaceTabPercPerRow
+sorted_df_Officer <-arrange(dvDataFrame, OFFICER_YEARS_ON_FORCE)
+offSubArrestedTab <- table(sorted_df_Officer$OFFICER_YEARS_ON_FORCE, sorted_df_Officer$SUBJECT_WAS_ARRESTED)
+offSubArrestedTab
+offSubArrested_df <- as.data.frame(offSubArrestedTab)
+names(offSubArrested_df) <- c("OFFICER_YEARS_ON_FORCE","SUBJECT_WAS_ARRESTED","COUNT")
+OffSubj_Race_dataframe <- as.data.frame(OfSubRaceTab)
+names(OffSubj_Race_dataframe) <- c("OFFICER_RACE", "SUBJECT_RACE", "COUNT")
+
+
+
+#convert the string data to numeric data
+dvDataFrame$OFFICER_YEARS_ON_FORCE<-as.numeric(dvDataFrame$OFFICER_YEARS_ON_FORCE)
+dvDataFrame$OFFICER_YEARS_ON_FORCE
+sorted_df_Officer<-arrange(dvDataFrame, OFFICER_YEARS_ON_FORCE)
+
+
+# create a subset of data for the variables of interest
+sub_race_dataFrame <- subset(dvDataFrame, select = c("DIVISION", "SUBJECT_RACE"))
+
+# count the frequency of each combination of DIVISION and SUBJECT_RACE
+count_freq_df <- as.data.frame(table(sub_race_dataFrame))
+
+# sort the DIVISION categories based on the count of each SUBJECT_RACE category
+count_freq_df$DIVISION <- reorder(count_freq_df$DIVISION, -count_freq_df$Freq, FUN=min)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Introduction:
+The purpose of this report is to analyze a dataset provided by the Center for Policing Equity, which contains information on crime incidents that occurred in Dallas, USA in the year 2016. The dataset includes various details, such as officer and subject information, location, race, date, time, and other metrics. The primary objective of this analysis is to identify any patterns or trends that can help improve the justice system in Dallas, Texas.
+
+
+## Exploring Police Arrests
+
+Our initial step involves a comprehensive exploration of the dataset. Subsequently, we conduct a detailed analysis on the following aspects:
+
+1) Can we identify any racial inequalities in the police activities being conducted?
+
+2) How prevalent are racial disparities in the department's activities?
+
+3) What are the underlying factors that contribute to the existence of racial disparities in police activities?
+
+## Examining the Presence of Racial Disparities in Police Activities
+
+**Correlation between Officer Race and Subject Race**
+
+Our next step involves creating a two-way table to analyze the relationship between the race of officers and the race of subjects involved in the incidents. Specifically, we aim to examine any potential associations between the two variables.
+```{r}
+table(dvDataFrame$OFFICER_RACE,dvDataFrame$SUBJECT_RACE)
+```
+
+We will present the same information in percentages to facilitate its interpretation and enhance its pellucidity .
+```{r}
+round( 100*prop.table(OfSubRaceTab))
+```
+
+Based on the data presented in the above table, it can be observed that the majority of the subjects involved in the incidents were classified as Black, while the majority of the officers who were associated with subjects of different races were White, with a tendency to be involved with Black subjects more frequently.
+
+To enhance the clarity and comprehensibility of the information, a barplot was utilized to visually represent the same data.
+```{r, warning=FALSE}
+# Create the barplot using ggplot
+ggplot(OffSubj_Race_dataframe, aes(x = OFFICER_RACE, fill = SUBJECT_RACE, y = COUNT)) +
+  labs(title = "Frequency Distribution of Officer Race and Subject Race",
+       x = "Officer Race",
+       y = "Count",
+       fill = "SUBJECT_RACE") +
+  geom_col(position = "dodge") +
+  theme_minimal()
+```
+
+Upon analyzing the data, it can be observed that the majority of the subjects across all officer races were classified as Black, while the White officers tended to be involved with a larger proportion of subjects from all racial categories.
+
+A histogram was generated to examine the distribution of the years of experience for police officers.
+
+```{r, warning=FALSE}
+# Create the histogram using ggplot
+ggplot(data = sorted_df_Officer, aes(x = OFFICER_YEARS_ON_FORCE)) +
+  labs(title = "Histogram of Officer Years on Force",
+       y = "Count",
+       x = "Officer Years on Force") +
+   geom_histogram(color = "black", fill = "lightblue", binwidth = 1) +
+  theme_minimal()
+
+```
+
+Upon analyzing the distribution of officer years on force by officer race, we can observe that the majority of police officers across all races have less than 10 years of experience. As the years of experience increase, there is a gradual decline in the number of police officers belonging to different races. This trend indicates that police departments tend to hire a significant number of young officers and retain them for shorter periods.
+
+Now, we aim to examine the relationship between the number of years a police officer has been in service and their respective race.
+```{r, fig.width=8, warning=FALSE}
+ggplot(dvDataFrame, aes(y = OFFICER_YEARS_ON_FORCE,x = OFFICER_RACE)) +
+  labs(title = "Distribution of Officer Years on Force by Subject Race",
+       y = "Officer Years on Force",
+       x = "Officer Race")+
+  geom_boxplot(fill = "#69b3a2", color = "#404040") 
+
+```
+
+The box plot reveals that the median years of experience for police officers is around 8 years, with a significant number of officers having less than 5 years of experience. Furthermore, we observe that there are several outliers for the Hispanic and White officer groups, indicating a larger number of officers with higher years of experience. This suggests that these two racial groups may have a larger proportion of experienced officers compared to other groups. The color-coded boxes and background of the plot, combined with the adjusted font size, enhance the visual appeal of the plot and make it easier to interpret the findings.
+
+
+Now, we aim to examine the potential relationship between the years of experience of police officers and the likelihood of the subject being arrested.
+
+```{r, warning=FALSE}
+
+
+ggplot(offSubArrested_df, aes(x =OFFICER_YEARS_ON_FORCE, fill =  SUBJECT_WAS_ARRESTED, y =COUNT )) +
+  geom_col(position = "dodge") +
+  labs(title = "Frequency Distribution of Officer years on force and Subject was arrested",
+       y = "Count",
+       x = "OFFICER_YEARS_ON_FORCE",
+       fill = "SUBJECT_WAS_ARRESTED") +
+  theme_minimal()
+
+ggplot(data = dvDataFrame, aes(x = OFFICER_YEARS_ON_FORCE)) +
+  geom_density(color = "red", fill = "orange") +
+  labs(title = "DENSITY PLOT COMPARING SERVICE OF POLICE OFFICER",
+       y = "DENSITY",
+       x = "OFFICER YEAR IN POLICE SERVICE") +
+  theme_minimal()
+```
+
+
+Based on the above plot, it can be observed that there is a higher frequency of police officers who are relatively new on the force that arrest a larger number of subjects compared to more experienced officers.
+
+Now lets see what were the reasons why subjects were arrested and of which race.
+```{r, warning=FALSE}
+subject_counts <- table(dvDataFrame$SUBJECT_DESCRIPTION)
+# Convert the table to a data frame
+subject_counts_df <- data.frame(SUBJECT_DESCRIPTION = names(subject_counts),
+                                count = as.vector(subject_counts))
+# Create a pie chart
+ ggplot(subject_counts_df, aes(x = "", fill = SUBJECT_DESCRIPTION, y = count))  +
+  coord_polar("y", start=0)+
+  geom_bar(stat = "identity", width = 1)+
+  labs(title = "Distribution of Subject Descriptions") +
+  theme_void() 
+
+```
+
+Let us explore the relationship between the demographic variable of subject race and the categorical variable of subject description.
+```{r, fig.height=10, warning=FALSE}
+
+sub_race_dataFrame <- dvDataFrame %>% 
+  group_by(SUBJECT_DESCRIPTION, SUBJECT_RACE) %>% 
+  count(name = "count")
+
+sub_df_sorted <- sub_race_dataFrame %>% 
+  arrange(SUBJECT_RACE, count) %>% 
+  group_by(SUBJECT_RACE) %>% 
+  mutate(row = row_number()) %>% 
+  ungroup()
+
+ggplot(data = sub_df_sorted, aes(x = SUBJECT_DESCRIPTION, y = count, fill = SUBJECT_RACE, order = row)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_discrete(guide = guide_legend(reverse = TRUE)) +
+  labs(title = "Bar plot of Subject Description and Subject Race",
+       x = "Subject Description",
+       y = "Count",
+       fill = "Subject Race") +
+  theme(axis.text.x = element_text(angle = 75, hjust = 1))+
+  geom_text(aes(label = count), position = position_stack(vjust = 0.5))
+```
+
+Based on the presented barplot, it can be observed that individuals of Black race are arrested for a wide range of reasons, followed by those of Hispanic race. Additionally, in the category of unknown description, Black individuals are the highest, followed by Hispanics. Furthermore, in the category of alcohol, as well as known and unknown drugs, Black individuals are arrested the most, followed by Hispanics.
+
+Based on the plots, it appears that police officers with experience ranging from 0 to 10 years exhibit a disproportionate tendency to arrest subjects belonging to the Hispanic and Black racial groups. 
+
+**Correlation between Division and Subject Race**
+
+We will investigate the association between Division and Subject Race using a plot based on best practices in data visualization.
+```{r, warning=FALSE}
+
+# plot a stacked bar chart
+ggplot(count_freq_df, aes(x=DIVISION, y=Freq, fill=SUBJECT_RACE)) +
+  geom_bar(stat="identity") +
+  labs(title = "Stacked Bar Plot of Division and Subject Race",
+       x = "Division",
+       y = "Count",
+       fill = "Subject Race") +
+  theme(axis.text.x = element_text(angle = 75, hjust = 1))
+
+sub_race_dataFrame <- subset(dvDataFrame, select = c(LOCATION_CITY, SUBJECT_RACE, SUBJECT_WAS_ARRESTED))
+
+ggplot(data = dvDataFrame, aes(fill = SUBJECT_RACE,x = DIVISION)) +
+  facet_grid(. ~ SUBJECT_WAS_ARRESTED)+
+  geom_bar(aes(y =after_stat(count)/sum(after_stat(count))), position = "dodge")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))  +
+  labs(title = "Arrested subjects by division and race",
+       x = "Division",
+       y = "Proportion",
+       fill = "Race") 
+```
+
+Upon analyzing the data, it is evident that individuals belonging to the Black and Hispanic race hold a higher proportion of arrests across all divisions. The South Central division seems to have the highest number of Black race subjects followed by the North East division. It is further observed that the North Central and North West divisions display a similar proportion of subjects, indicating no significant disparity in these divisions.Additionally, the statistics suggest that the ratio of subjects arrested to those not arrested is also significantly higher in these racial groups.
+
+**Corelation among Subject Arrest, Subject race and Subject gender**
+
+Our objective now is to investigate the relationship between three categorical variables - Subject Arrest, Subject Race, and Subject Gender. By analyzing these variables, we can potentially identify any patterns or disparities in arrest rates among different demographic groups. By understanding these relationships, we may be able to uncover insights into potential biases or discrimination in law enforcement practices.
+
+```{r, fig.height=10, warning=FALSE}
+
+ggplot(dvDataFrame, aes(x =SUBJECT_RACE, color = SUBJECT_GENDER, y = SUBJECT_WAS_ARRESTED))  + 
+  labs(title = "Scatter plot of Subject Race vs. Arrested, by Gender",
+       x = "Subject Race",
+       y = "Subject Arrested ",
+       color = "Subject Gender")+ 
+  geom_jitter()
+```
+
+The scatter plot reveals that male subjects belonging to the black race constitute the majority, followed by those belonging to the Hispanic and white races. Based on this observation, we can infer that male subjects from the black, Hispanic, and white races are more likely to be subjected to ill-treatment. This information provides valuable insight into the prevalence of police brutality among different gender and racial groups.
+
+**Correlation analysis**
+
+The below plot shows the correlation among various columns of the data set
+
+```{r, fig.height=10, warning=FALSE}
+
+
+corPlotDf <- dvDataFrame %>% 
+  filter(SUBJECT_RACE == "Black"| OFFICER_RACE == "American Ind"| OFFICER_RACE == "Asian"| SUBJECT_RACE == "Asian"| OFFICER_RACE == "Black" | SUBJECT_RACE == "White" | SUBJECT_RACE == "Hispanic" | SUBJECT_RACE == "American Ind"  | OFFICER_RACE == "White" | OFFICER_RACE == "Hispanic"  )
+
+
+# Remove rows with missing values in LOCATION_LATITUDE and LOCATION_LONGITUDE columns
+corPlotDf <- corPlotDf %>% 
+  filter( !is.na(LOCATION_LATITUDE),!is.na(SUBJECT_GENDER), !is.na(LOCATION_LONGITUDE))
+
+
+corPlotDf$SUBJECT_INJURY <- ifelse(corPlotDf$SUBJECT_INJURY == "No", 0, 1)
+corPlotDf$OFFICER_GENDER <- ifelse(corPlotDf$OFFICER_GENDER == "Male", 0, 1)
+corPlotDf$OFFICER_INJURY <- ifelse(corPlotDf$OFFICER_INJURY == "No", 0, 1)
+corPlotDf$SUBJECT_GENDER <- ifelse(corPlotDf$SUBJECT_GENDER == "Male", 0, 1)	
+
+corPlotDf$SUBJECT_RACE_NUMERIC <- ifelse(corPlotDf$SUBJECT_RACE == "Black", 1,
+                                        ifelse(corPlotDf$SUBJECT_RACE == "White", 2,
+                                               ifelse(corPlotDf$SUBJECT_RACE == "Hispanic", 3,
+                                                      ifelse(corPlotDf$SUBJECT_RACE == "American Ind", 4,
+                                                             ifelse(corPlotDf$SUBJECT_RACE == "Asian", 5, NA)))))
+
+
+corPlotDf$OFFICER_RACE_NUMERIC <- ifelse(corPlotDf$OFFICER_RACE == "Black", 1,
+                                        ifelse(corPlotDf$OFFICER_RACE == "White", 2,
+                                               ifelse(corPlotDf$OFFICER_RACE == "Hispanic", 3,
+                                                      ifelse(corPlotDf$OFFICER_RACE == "American Ind", 4,
+                                                             ifelse(corPlotDf$OFFICER_RACE == "Asian", 5, NA)))))
+
+
+
+
+
+corPlotDf$DIVISION <- factor(corPlotDf$DIVISION)
+
+corPlotDf$DIVISION <- as.numeric(corPlotDf$DIVISION)
+
+corPlotDf$OFFICER_YEARS_ON_FORCE <- as.numeric(as.character(corPlotDf$OFFICER_YEARS_ON_FORCE))
+
+
+
+dataCorrela <- select(corPlotDf, DIVISION, LOCATION_LATITUDE, SUBJECT_GENDER, OFFICER_INJURY,
+                      SUBJECT_INJURY, OFFICER_RACE_NUMERIC, SUBJECT_RACE_NUMERIC, LOCATION_LONGITUDE,
+                      OFFICER_YEARS_ON_FORCE, OFFICER_GENDER) %>%
+  mutate_if(is.character, as.numeric)
+
+
+
+matrixCor <- cor(dataCorrela, use="pairwise.complete.obs")
+corrplot(matrixCor, method = "color", type = "upper", tl.cex = 0.5)
+
+```
+
+Based on the plot above, it appears that there is a positive correlation between the number of years an officer has served and their gender.
+
+***Map ***
+
+The following visualization illustrates a geographical map containing plotted locations indicated by their respective latitude and longitude coordinates. The dataset comprises information on various incidents of criminal activity, and thirty of these observations have been selected and marked on the map. Each coordinate represents the location where a specific crime was committed. This map is interactive and displays the name of the district when hovering over each location.
+
+```{r, fig.height=10, warning=FALSE}
+
+mapsampledf <- dvDataFrame[sample(nrow(dvDataFrame),30),]
+
+mapsampledf$LOCATION_LATITUDE <- as.numeric(mapsampledf$LOCATION_LATITUDE)
+mapsampledf$LOCATION_LONGITUDE <- as.numeric(mapsampledf$LOCATION_LONGITUDE)
+
+cm<-m <- leaflet(mapsampledf) %>%
+  addTiles() %>% addMarkers(lat = ~LOCATION_LATITUDE,lng = ~LOCATION_LONGITUDE,popup = ~paste("DISTRICT Serial NUMBER:",LOCATION_DISTRICT))
+cm
+
+```
+The following is  an interactive map that displays circles of different sizes, representing the frequency of crimes in different locations. The larger the circle, the higher the frequency of crimes reported in that location. The map is interactive and users can hover over each circle to get additional information such as the specific location and the number of crimes reported.
+
+```{r, warning=FALSE}
+freqCrimeData <- dvDataFrame %>%
+  group_by(LOCATION_LATITUDE, LOCATION_LONGITUDE) %>%
+  summarize(crime_count = n())
+freqCrimeData$LOCATION_LONGITUDE <- as.numeric(freqCrimeData$LOCATION_LONGITUDE)
+freqCrimeData$LOCATION_LATITUDE <- as.numeric(freqCrimeData$LOCATION_LATITUDE)
+
+# Plot the map with circles proportional to crime frequency
+leaflet(freqCrimeData) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    lng = ~LOCATION_LONGITUDE, 
+    lat = ~LOCATION_LATITUDE, 
+    radius = ~sqrt(crime_count) * 15, 
+    popup = ~paste("Crime frequency: ", crime_count), 
+    color = "lightblue"
+  )
+
+
+```
+**Correlation between Incident date and incident count**
+
+Now we aim  to examine the frequency of crimes that took place in the year 2016 and explore any possible patterns or trends in the data. We intend to visualize the number of crimes that occurred in the given year and investigate whether there are any seasonal or other variations in the data.
+```{r, warning=FALSE}
+incDateDf <- dvDataFrame %>% 
+  group_by(INCIDENT_DATE) %>% 
+  summarize(count=n())
+mean_count <- mean(incDateDf$count)
+ggplot(incDateDf, aes(x = INCIDENT_DATE, y = count)) + 
+  labs(title = "Crimes time series", y = "Incident Count", x = "Incident Date")+ 
+  geom_line()+
+  stat_smooth(aes(y = count), se = FALSE, method = "auto", span = 0.3, color = "red")
+
+```
+
+Based on the depicted time series plot, it can be observed that the occurrence of crimes has shown a gradual decline over the course of the year, with higher frequencies recorded at the start of the year, followed by a downward trend towards the end of the year.
+
+**Marijuana incidents month wise distribution**
+```{r, warning=FALSE}
+incMonthCount_data <- dvDataFrame %>% 
+  filter(SUBJECT_DESCRIPTION == "Marijuana") %>% 
+  group_by(INCIDENT_MONTH) %>% 
+  summarise(count=n())
+ggplot(data = incMonthCount_data, aes(factor(INCIDENT_MONTH, month.name), count, group = 1)) +
+  geom_smooth(method = "loess", color = "red", span = 1/5) +
+  geom_line(size = 0.5, col = "gray") +
+  labs(x = "Months", y = "INCIDENT COUNTS", title = "Marijuana incidents month wise distribution")+
+  theme_minimal()
+  
+
+```
+
+Based on the plotted graph, we can observe that there was a peak in the number of marijuana cases at the beginning of the year, which then decreased in February, and gradually increased thereafter. In June, the number of cases reached a level similar to that observed in February and then increased sharply again.
+
+**Conclusion:**
+
+1. The majority of the subjects involved in incidents were classified as Black, and White officers were associated with Black subjects more frequently.
+
+2. The majority of police officers across all races have less than 10 years of experience, indicating police departments tend to hire young officers and retain them for shorter periods.
+
+3. There is a higher frequency of police officers with less experience on the force arresting a larger number of subjects, especially those belonging to the Hispanic and Black racial groups.
+
+4. Black and Hispanic individuals hold a higher proportion of arrests across all divisions, and the South Central division has the highest number of Black race subjects. 
+
+5. Male subjects belonging to the Black race constitute the majority, followed by those belonging to the Hispanic and White races, indicating that male subjects from these races are more likely to be subjected to ill-treatment.
+
+6. The occurrence of crimes showed a gradual decline over the course of the year, with higher frequencies recorded at the start of the year.
+
+7. There was a peak in the number of marijuana cases at the beginning of the year, which then decreased in February, and gradually increased thereafter. In June, the number of cases reached a level similar to that observed in February and then increased sharply again.
+
+Overall, the insights suggest potential biases or discrimination in law enforcement practices against Black and Hispanic individuals, especially males. The hiring and retention practices of police departments may also contribute to these biases. The trends in crime occurrence and marijuana cases can provide valuable information for law enforcement agencies to plan and allocate resources effectively.
